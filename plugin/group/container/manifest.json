@@ -1,0 +1,14 @@
+{
+    "manifestVersion": "v0.1",
+    "description": "group driver for aws",
+    "documentation": "https://docs.docker.com/engine/extend/plugins/",
+    "entrypoint": ["group", "--listen=unix:///run/docker/plugins/group.sock"],
+    "network": {
+        "type": "host"
+    },
+    "interface" : {
+        "types": ["docker.groupDriver/1.0"],
+        "socket": "group.sock"
+    },
+    "mounts":[]
+}
