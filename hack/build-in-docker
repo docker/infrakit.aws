@@ -55,7 +55,7 @@ echo 'Building'
 container_id=$(docker run --detach \
   -v "$PWD":/go/src/$REPO \
   -w /go/src/$REPO \
-  golang:1.6-alpine \
+  golang:1.7-alpine \
   go build -ldflags "$LDFLAGS" -o /build/$BIN_NAME $PACKAGES)
 
 exit_code=$(docker wait $container_id)

@@ -108,8 +108,20 @@ type CreateInstanceRequest struct {
 	RunInstancesInput ec2.RunInstancesInput `json:"run_instances_input"`
 }
 
+// Validate validates a provision request
+func (p provisioner) Validate(req json.RawMessage) error {
+	// TODO validation needs to do some consistency checks between the raw message and other attributes
+	// like privateIP, etc. The plugin API needs a little retooling.
+	return nil
+}
+
 // Provision creates a new instance.
-func (p provisioner) Provision(req string, volume *instance.VolumeID, tags map[string]string) (*instance.ID, error) {
+func (p provisioner) Provision(
+	req json.RawMessage,
+	tags map[string]string,
+	bootscript string,
+	privateIP *string,
+	volume *instance.VolumeID) (*instance.ID, error) {
 
 	request := CreateInstanceRequest{}
 	err := json.Unmarshal([]byte(req), &request)
