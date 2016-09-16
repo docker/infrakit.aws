@@ -96,8 +96,11 @@ func main() {
 			}
 
 			grp := group_plugin.NewGroupPlugin(
-				map[string]instance.Plugin{
-					"aws": provisioner,
+				func(k string) (instance.Plugin, error) {
+					if k == "aws" {
+						return provisioner, nil
+					}
+					return nil, nil
 				},
 				swarm.NewSwarmProvisionHelper(dockerClient),
 				1*time.Second)
