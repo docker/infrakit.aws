@@ -1,5 +1,7 @@
 # InfraKit.AWS
 
+[![CircleCI](https://circleci.com/gh/docker/infrakit.aws.svg?style=svg)](https://circleci.com/gh/docker/infrakit.aws)
+
 [InfraKit](https://github.com/docker/infrakit) plugins for creating and managing resources in Amazon AWS.
 
 ## Instance plugin
