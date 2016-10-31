@@ -447,15 +447,12 @@ func InstanceTags(resourceTag ec2.Tag, gid group.ID) map[string]string {
 	}
 }
 
-const (
-	prepareGroupWatches = `
-{{ range $name, $config := . }}
+const prepareGroupWatches = `{{ range $name, $config := . }}
 cat << EOF > "{{ $name }}.json"
 {{ $config }}
 EOF
 {{ end }}
 `
-)
 
 func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 	log.Info("Starting cluster boot leader instance")
@@ -479,12 +476,25 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 		return err
 	}
 
+
+	/*
+	mkdir /plugins
+	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-flavor-combo &
+	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-flavor-swarm &
+	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-flavor-vanilla &
+	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-group-default &
+	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-instance-aws &
+
+	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins -v /Managers.json:/Managers.json wfarner/infrakit-demo-plugins infrakit group watch /Managers.json
+	 */
+
 	// TODO(wfarner): Include shell code that creates infrakit group JSON files, and watches the groups.
 	managerGroup.Config.RunInstancesInput.UserData = aws.String(strings.Join([]string{
 		"#!/bin/bash",
 		string(buffer.Bytes()),
-		"curl -sSL https://get.docker.com/ | sh",
 		initializeManager,
+		"curl -sSL https://get.docker.com/ | sh",
+
 		"docker swarm init",
 	}, "\n"))
 
@@ -504,7 +514,7 @@ const (
 	// TODO(wfarner): Ideally we would have a better indicator of a file system that has not yet been formatted
 	// than inspecting the block device.  For examlpe, a trashed file system may be grounds for operator
 	// intervention rather than the system deciding to clear its state.
-	initializeManager = `#!/bin/bash
+	initializeManager = `
 # See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html why device naming is tricky, and likely
 # coupled to the AMI (host OS) used.
 EBS_DEVICE=/dev/xvdf
