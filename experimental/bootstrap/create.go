@@ -455,18 +455,19 @@ EOF
 
 mkdir /plugins
 
-run_plugin='docker run -d --restart always -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins'
+discovery='-e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins'
+run_plugin="docker run -d --restart always $discovery"
 image=wfarner/infrakit-demo-plugins
 
 docker pull $image
-$run_plugin $image infrakit-flavor-combo
-$run_plugin -v /var/run/docker.sock:/var/run/docker.sock $image infrakit-flavor-swarm
-$run_plugin $image infrakit-flavor-vanilla
-$run_plugin $image infrakit-group-default
-$run_plugin $image infrakit-instance-aws
+$run_plugin --name flavor-combo $image infrakit-flavor-combo
+$run_plugin --name flavor-swarm -v /var/run/docker.sock:/var/run/docker.sock $image infrakit-flavor-swarm
+$run_plugin --name flavor-vanilla $image infrakit-flavor-vanilla
+$run_plugin --name group-default $image infrakit-group-default
+$run_plugin --name instance-aws $image infrakit-instance-aws
 
 {{ range $name, $config := . }}
-$run_plugin -v /{{ $name }}.json:/{{ $name }}.json $image infrakit group watch /{{ $name }}.json
+docker run $discovery -v /{{ $name }}.json:/{{ $name }}.json $image infrakit group watch /{{ $name }}.json
 {{ end }}
 `
 
