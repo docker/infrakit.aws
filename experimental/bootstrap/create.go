@@ -564,7 +564,8 @@ const (
           {
             "Plugin": "flavor-swarm",
             "Properties": {
-              "Type": "manager"
+              "Type": "manager",
+              "DockerRestartCommand": "systemctl restart docker"
             }
           }
         ]
@@ -599,7 +600,8 @@ const (
           {
             "Plugin": "flavor-swarm",
             "Properties": {
-              "Type": "worker"
+              "Type": "worker",
+              "DockerRestartCommand": "systemctl restart docker"
             }
           }
         ]
