@@ -447,6 +447,16 @@ func InstanceTags(resourceTag ec2.Tag, gid group.ID) map[string]string {
 	}
 }
 
+const (
+	prepareGroupWatches = `
+{{ range $name, $config := . }}
+cat << EOF > "{{ $name }}.json"
+{{ $config }}
+EOF
+{{ end }}
+`
+)
+
 func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 	log.Info("Starting cluster boot leader instance")
 	builder := infrakit_instance.Builder{Config: config}
@@ -457,9 +467,22 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 
 	managerGroup := spec.managers()
 
+	// Produce InfraKit groups.
+	infrakitGroups, err := generateInfraKitGroups(spec)
+	if err != nil {
+		return err
+	}
+
+	buffer := bytes.Buffer{}
+	err = template.Must(template.New("").Parse(prepareGroupWatches)).Execute(&buffer, infrakitGroups)
+	if err != nil {
+		return err
+	}
+
 	// TODO(wfarner): Include shell code that creates infrakit group JSON files, and watches the groups.
 	managerGroup.Config.RunInstancesInput.UserData = aws.String(strings.Join([]string{
 		"#!/bin/bash",
+		string(buffer.Bytes()),
 		"curl -sSL https://get.docker.com/ | sh",
 		initializeManager,
 		"docker swarm init",
@@ -664,23 +687,11 @@ func bootstrap(spec clusterSpec) error {
 		log.Infof("You can see other nodes tha thave joined the cluster by running 'docker node ls'")
 	}
 
-	// Produce InfraKit groups.
-	infrakitGroups, err := generateInfraKitGroups(spec)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("InfraKit Group:")
-	for _, infrakitGroup := range infrakitGroups {
-		fmt.Println(infrakitGroup)
-		fmt.Println()
-	}
-
 	return nil
 }
 
-func generateInfraKitGroups(spec clusterSpec) ([]string, error) {
-	groups := []string{}
+func generateInfraKitGroups(spec clusterSpec) (map[group.ID]string, error) {
+	groups := map[group.ID]string{}
 
 	for _, grp := range spec.Groups {
 		buffer := bytes.Buffer{}
@@ -714,7 +725,7 @@ func generateInfraKitGroups(spec clusterSpec) ([]string, error) {
 			return nil, err
 		}
 
-		groups = append(groups, string(buffer.Bytes()))
+		groups[grp.Name] = string(buffer.Bytes())
 	}
 
 	return groups, nil
