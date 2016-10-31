@@ -452,6 +452,22 @@ cat << EOF > "{{ $name }}.json"
 {{ $config }}
 EOF
 {{ end }}
+
+mkdir /plugins
+
+run_plugin='docker run -d --restart always -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins'
+image=wfarner/infrakit-demo-plugins
+
+docker pull $image
+$run_plugin $image infrakit-flavor-combo
+$run_plugin -v /var/run/docker.sock:/var/run/docker.sock $image infrakit-flavor-swarm
+$run_plugin $image infrakit-flavor-vanilla
+$run_plugin $image infrakit-group-default
+$run_plugin $image infrakit-instance-aws
+
+{{ range $name, $config := . }}
+$run_plugin -v /{{ $name }}.json:/{{ $name }}.json $image infrakit group watch /{{ $name }}.json
+{{ end }}
 `
 
 func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
@@ -476,26 +492,13 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 		return err
 	}
 
-
-	/*
-	mkdir /plugins
-	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-flavor-combo &
-	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-flavor-swarm &
-	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-flavor-vanilla &
-	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-group-default &
-	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins wfarner/infrakit-demo-plugins infrakit-instance-aws &
-
-	docker run --rm -e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins -v /Managers.json:/Managers.json wfarner/infrakit-demo-plugins infrakit group watch /Managers.json
-	 */
-
 	// TODO(wfarner): Include shell code that creates infrakit group JSON files, and watches the groups.
 	managerGroup.Config.RunInstancesInput.UserData = aws.String(strings.Join([]string{
 		"#!/bin/bash",
-		string(buffer.Bytes()),
 		initializeManager,
 		"curl -sSL https://get.docker.com/ | sh",
-
 		"docker swarm init",
+		string(buffer.Bytes()),
 	}, "\n"))
 
 	rawConfig, err := json.Marshal(managerGroup.Config)
