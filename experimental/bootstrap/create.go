@@ -458,7 +458,7 @@ mkdir -p $configs
 mkdir -p $plugins
 
 {{ range $name, $config := . }}
-cat << EOF > "$configs/{{ $name }}.json"
+cat << 'EOF' > "$configs/{{ $name }}.json"
 {{ $config }}
 EOF
 {{ end }}
