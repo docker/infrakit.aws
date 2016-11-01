@@ -566,8 +566,8 @@ const (
             "Properties": {
               "Init": [
                 "#!/bin/bash",
-                "curl -sSL https://get.docker.com/ | sh",
-                {{.BootScript}}
+                {{.BootScript}},
+                "curl -sSL https://get.docker.com/ | sh"
               ]
             }
           },
