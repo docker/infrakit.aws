@@ -447,17 +447,21 @@ func InstanceTags(resourceTag ec2.Tag, gid group.ID) map[string]string {
 	}
 }
 
-const prepareGroupWatches = `{{ range $name, $config := . }}
-cat << EOF > "{{ $name }}.json"
+const prepareGroupWatches = `
+plugins=/infrakit/plugins
+configs=/infrakit/configs
+discovery="-e INFRAKIT_PLUGINS_DIR=$plugins -v $plugins:$plugins"
+run_plugin="docker run -d --restart always $discovery"
+image=wfarner/infrakit-demo-plugins
+
+mkdir -p $configs
+mkdir -p $plugins
+
+{{ range $name, $config := . }}
+cat << EOF > "$configs/{{ $name }}.json"
 {{ $config }}
 EOF
 {{ end }}
-
-mkdir /plugins
-
-discovery='-e INFRAKIT_PLUGINS_DIR=/plugins -v /plugins:/plugins'
-run_plugin="docker run -d --restart always $discovery"
-image=wfarner/infrakit-demo-plugins
 
 docker pull $image
 $run_plugin --name flavor-combo $image infrakit-flavor-combo
@@ -466,8 +470,10 @@ $run_plugin --name flavor-vanilla $image infrakit-flavor-vanilla
 $run_plugin --name group-default $image infrakit-group-default
 $run_plugin --name instance-aws $image infrakit-instance-aws
 
+echo "alias infrakit='docker run --rm $discovery $image infrakit'" >> /home/ubuntu/.bashrc
+
 {{ range $name, $config := . }}
-docker run $discovery -v /{{ $name }}.json:/{{ $name }}.json $image infrakit group watch /{{ $name }}.json
+docker run --rm $discovery -v $configs:$configs $image infrakit group watch $configs/{{ $name }}.json
 {{ end }}
 `
 
@@ -519,6 +525,10 @@ const (
 	// than inspecting the block device.  For examlpe, a trashed file system may be grounds for operator
 	// intervention rather than the system deciding to clear its state.
 	initializeManager = `
+set -o errexit
+set -o nounset
+set -o xtrace
+
 # See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html why device naming is tricky, and likely
 # coupled to the AMI (host OS) used.
 EBS_DEVICE=/dev/xvdf
@@ -531,7 +541,7 @@ then
 fi
 
 mkdir -p /var/lib/docker
-echo "$EBS_DEVICE /var/lib/docker ext4 defaults,nofail 0 2" > /etc/fstab
+echo "$EBS_DEVICE /var/lib/docker ext4 defaults,nofail 0 2" >> /etc/fstab
 mount -a
 `
 )
