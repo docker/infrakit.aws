@@ -72,7 +72,8 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 	var keyName string
 
 	workerSize := 3
-
+	ami := "ami-6e165d0e" //"ami-a9d276c9" //"ami-bd4f05dd"
+	az := "b"
 	createCmd := cobra.Command{
 		Use:   "create [<cluster config>]",
 		Short: "create a swarm cluster",
@@ -95,11 +96,11 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 
 				instanceConfig := instance.CreateInstanceRequest{
 					RunInstancesInput: ec2.RunInstancesInput{
-						ImageId: aws.String("ami-a9d276c9"),
+						ImageId: aws.String(ami),
 						KeyName: aws.String(keyName),
 						Placement: &ec2.Placement{
 							// TODO(wfarner): Picking the AZ like this feels hackish.
-							AvailabilityZone: aws.String(cluster.ID.region + "a"),
+							AvailabilityZone: aws.String(cluster.ID.region + az),
 						},
 					},
 					Tags: map[string]string{"infrakit.cluster": cluster.ID.name},
@@ -138,6 +139,8 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 		},
 	}
 	createCmd.Flags().AddFlagSet(cluster.flags())
+	createCmd.Flags().StringVar(&keyName, "ami", ami, "AMI to use")
+	createCmd.Flags().StringVar(&az, "az", az, "Availability zone to use")
 	createCmd.Flags().StringVar(&keyName, "key", "", "The existing SSH key in AWS to use for provisioned instances")
 	createCmd.Flags().IntVar(&workerSize, "worker_size", workerSize, "Size of worker group")
 

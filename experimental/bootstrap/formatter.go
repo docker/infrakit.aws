@@ -14,7 +14,8 @@ import (
 	"time"
 )
 
-func formatVolumes(config client.ConfigProvider, spec clusterSpec, volumeIDs []*string) error {
+// ami = "ami-99c812f9"
+func formatVolumes(config client.ConfigProvider, spec clusterSpec, volumeIDs []*string, ami string) error {
 	log.Info("Formatting Swarm data EBS volumes")
 
 	// TODO(wfarner): Could we instead format on the bootstrap volume, as part of other bootstrap operations
@@ -44,7 +45,7 @@ func formatVolumes(config client.ConfigProvider, spec clusterSpec, volumeIDs []*
 	instance, err := ec2Client.RunInstances(&ec2.RunInstancesInput{
 		InstanceType: aws.String("t2.micro"),
 		KeyName:      spec.managers().Config.RunInstancesInput.KeyName,
-		ImageId:      aws.String("ami-99c812f9"),
+		ImageId:      aws.String(ami),
 		Placement: &ec2.Placement{
 			AvailabilityZone: aws.String(spec.availabilityZone()),
 		},
