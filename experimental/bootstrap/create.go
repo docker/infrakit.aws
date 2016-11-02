@@ -507,7 +507,6 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 	managerGroup.Config.RunInstancesInput.UserData = aws.String(strings.Join([]string{
 		"#!/bin/bash",
 		initializeManager,
-		"curl -sSL https://get.docker.com/ | sh",
 		"docker swarm init",
 		string(buffer.Bytes()),
 	}, "\n"))
@@ -544,9 +543,13 @@ then
   mkfs -t ext4 $EBS_DEVICE
 fi
 
+systemctl stop docker
+rm -rf /var/lib/docker
+
 mkdir -p /var/lib/docker
 echo "$EBS_DEVICE /var/lib/docker ext4 defaults,nofail 0 2" >> /etc/fstab
 mount -a
+systemctl start docker
 `
 )
 
@@ -570,8 +573,7 @@ const (
             "Properties": {
               "Init": [
                 "#!/bin/bash",
-                {{.BootScript}},
-                "curl -sSL https://get.docker.com/ | sh"
+                {{.BootScript}}
               ]
             }
           },
@@ -599,26 +601,10 @@ const (
       "Properties": {{.CreateInstanceRequest}}
     },
     "Flavor": {
-      "Plugin": "flavor-combo",
+      "Plugin": "flavor-swarm",
       "Properties": {
-        "Flavors": [
-          {
-            "Plugin": "flavor-vanilla",
-            "Properties": {
-              "Init": [
-                "#!/bin/bash",
-                "curl -sSL https://get.docker.com/ | sh"
-              ]
-            }
-          },
-          {
-            "Plugin": "flavor-swarm",
-            "Properties": {
-              "Type": "worker",
-              "DockerRestartCommand": "systemctl restart docker"
-            }
-          }
-        ]
+        "Type": "worker",
+        "DockerRestartCommand": "systemctl restart docker"
       }
     }
   }
