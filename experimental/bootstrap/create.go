@@ -451,6 +451,8 @@ const prepareGroupWatches = `
 plugins=/infrakit/plugins
 configs=/infrakit/configs
 discovery="-e INFRAKIT_PLUGINS_DIR=$plugins -v $plugins:$plugins"
+local_store="-v /infrakit/:/infrakit/"
+docker="-v /var/run/docker.sock:/var/run/docker.sock"
 run_plugin="docker run -d --restart always $discovery"
 image=wfarner/infrakit-demo-plugins
 image2=chungers/infrakit-bundle
@@ -473,8 +475,8 @@ $run_plugin --name group-stateless $image infrakit-group-default --name group-st
 $run_plugin --name instance-aws $image infrakit-instance-aws --log 5
 $run_plugin --name manager -v /var/run/docker.sock:/var/run/docker.sock $image2 infrakit-manager swarm --proxy-for-group group-stateless --name group --log 5
 
-echo "alias infrakit='docker run --rm $discovery $image2 infrakit'" >> /home/ubuntu/.bashrc
-echo "alias infrakit='docker run --rm $discovery $image2 infrakit'" >> /root/.bashrc
+echo "alias infrakit='docker run --rm $discovery $local_store $docker $image2 infrakit'" >> /home/ubuntu/.bashrc
+echo "alias infrakit='docker run --rm $discovery $local_store $docker $image2 infrakit'" >> /root/.bashrc
 
 {{ range $name, $config := . }}
 docker run --rm $discovery -v $configs:$configs $image infrakit group watch $configs/{{ $name }}.json

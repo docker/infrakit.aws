@@ -72,7 +72,7 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 	var keyName string
 
 	workerSize := 3
-	ami := "ami-6e165d0e" //"ami-a9d276c9" //"ami-bd4f05dd"
+	ami := "ami-bd4f05dd" // generic - "ami-6e165d0e"
 	az := "b"
 	createCmd := cobra.Command{
 		Use:   "create [<cluster config>]",
@@ -139,7 +139,7 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 		},
 	}
 	createCmd.Flags().AddFlagSet(cluster.flags())
-	createCmd.Flags().StringVar(&keyName, "ami", ami, "AMI to use")
+	createCmd.Flags().StringVar(&ami, "ami", ami, "AMI to use")
 	createCmd.Flags().StringVar(&az, "az", az, "Availability zone to use")
 	createCmd.Flags().StringVar(&keyName, "key", "", "The existing SSH key in AWS to use for provisioned instances")
 	createCmd.Flags().IntVar(&workerSize, "worker_size", workerSize, "Size of worker group")
