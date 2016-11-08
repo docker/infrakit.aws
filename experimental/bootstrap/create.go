@@ -452,10 +452,10 @@ plugins=/infrakit/plugins
 configs=/infrakit/configs
 discovery="-e INFRAKIT_PLUGINS_DIR=$plugins -v $plugins:$plugins"
 local_store="-v /infrakit/:/infrakit/"
-docker="-v /var/run/docker.sock:/var/run/docker.sock"
+docker_client="-v /var/run/docker.sock:/var/run/docker.sock"
 run_plugin="docker run -d --restart always $discovery"
 image=wfarner/infrakit-demo-plugins
-image2=chungers/infrakit-bundle
+manager=chungers/infrakit-bundle
 
 mkdir -p $configs
 mkdir -p $plugins
@@ -467,16 +467,16 @@ EOF
 {{ end }}
 
 docker pull $image
-docker pull $image2
+docker pull $manager
 $run_plugin --name flavor-combo $image infrakit-flavor-combo --log 5
-$run_plugin --name flavor-swarm -v /var/run/docker.sock:/var/run/docker.sock $image2 infrakit-flavor-swarm --log 5 --name flavor-swarm
+$run_plugin --name flavor-swarm $docker_client $image infrakit-flavor-swarm --log 5 --name flavor-swarm
 $run_plugin --name flavor-vanilla $image infrakit-flavor-vanilla --log 5
 $run_plugin --name group-stateless $image infrakit-group-default --name group-stateless --log 5
 $run_plugin --name instance-aws $image infrakit-instance-aws --log 5
-$run_plugin --name manager -v /var/run/docker.sock:/var/run/docker.sock $image2 infrakit-manager swarm --proxy-for-group group-stateless --name group --log 5
+$run_plugin --name manager $docker_client $manager infrakit-manager swarm --proxy-for-group group-stateless --name group --log 5
 
-echo "alias infrakit='docker run --rm $discovery $local_store $docker $image2 infrakit'" >> /home/ubuntu/.bashrc
-echo "alias infrakit='docker run --rm $discovery $local_store $docker $image2 infrakit'" >> /root/.bashrc
+echo "alias infrakit='docker run --rm $discovery $local_store $docker_client $manager infrakit'" >> /home/ubuntu/.bashrc
+echo "alias infrakit='docker run --rm $discovery $local_store $docker_client $manager infrakit'" >> /root/.bashrc
 
 {{ range $name, $config := . }}
 docker run --rm $discovery -v $configs:$configs $image infrakit group watch $configs/{{ $name }}.json

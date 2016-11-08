@@ -51,7 +51,7 @@ type clusterIDFlags struct {
 
 func (c *clusterIDFlags) flags() *pflag.FlagSet {
 	clusterIDFlags := pflag.NewFlagSet("cluster ID", pflag.ExitOnError)
-	clusterIDFlags.StringVar(&c.ID.region, "region", "", "AWS region")
+	clusterIDFlags.StringVar(&c.ID.region, "region", "us-west-1", "AWS region")
 	clusterIDFlags.StringVar(&c.ID.name, "cluster", "", "Infrakit cluster name")
 	return clusterIDFlags
 }
