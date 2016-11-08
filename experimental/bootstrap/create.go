@@ -447,7 +447,7 @@ func InstanceTags(resourceTag ec2.Tag, gid group.ID) map[string]string {
 	}
 }
 
-const prepareGroupWatches = `
+const startInfraKit = `
 plugins=/infrakit/plugins
 configs=/infrakit/configs
 discovery="-e INFRAKIT_PLUGINS_DIR=$plugins -v $plugins:$plugins"
@@ -460,12 +460,6 @@ manager=chungers/infrakit-bundle
 mkdir -p $configs
 mkdir -p $plugins
 
-{{ range $name, $config := . }}
-cat << 'EOF' > "$configs/{{ $name }}.json"
-{{ $config }}
-EOF
-{{ end }}
-
 docker pull $image
 docker pull $manager
 $run_plugin --name flavor-combo $image infrakit-flavor-combo --log 5
@@ -477,6 +471,16 @@ $run_plugin --name manager $docker_client $manager infrakit-manager swarm --prox
 
 echo "alias infrakit='docker run --rm $discovery $local_store $docker_client $manager infrakit'" >> /home/ubuntu/.bashrc
 echo "alias infrakit='docker run --rm $discovery $local_store $docker_client $manager infrakit'" >> /root/.bashrc
+`
+
+const prepareGroupWatches = `
+image=wfarner/infrakit-demo-plugins
+
+{{ range $name, $config := . }}
+cat << 'EOF' > "$configs/{{ $name }}.json"
+{{ $config }}
+EOF
+{{ end }}
 
 {{ range $name, $config := . }}
 docker run --rm $discovery -v $configs:$configs $image infrakit group watch $configs/{{ $name }}.json
@@ -510,6 +514,7 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 		"#!/bin/bash",
 		initializeManager,
 		"docker swarm init",
+		startInfraKit,
 		string(buffer.Bytes()),
 	}, "\n"))
 
@@ -722,7 +727,10 @@ func generateInfraKitGroups(spec clusterSpec) (map[group.ID]string, error) {
 		if grp.isManager() {
 			templateText = managerGroup
 			templateParams["ManagerIPs"] = spec.ManagerIPs
-			templateParams["BootScript"] = initializeManager
+			templateParams["BootScript"] = strings.Join([]string{
+				initializeManager,
+				startInfraKit,
+			}, "\n")
 		} else {
 			templateText = workerGroup
 			templateParams["WorkerCount"] = grp.Size
