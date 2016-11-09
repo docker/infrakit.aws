@@ -484,6 +484,9 @@ cat << 'EOF' > "$configs/{{ $name }}.json"
 EOF
 {{ end }}
 
+# sleep until leadership is decided
+sleep 10
+
 {{ range $name, $config := . }}
 docker run --rm $discovery -v $configs:$configs $image infrakit group watch $configs/{{ $name }}.json
 {{ end }}
