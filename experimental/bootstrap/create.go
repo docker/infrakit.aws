@@ -455,7 +455,7 @@ local_store="-v /infrakit/:/infrakit/"
 docker_client="-v /var/run/docker.sock:/var/run/docker.sock"
 run_plugin="docker run -d --restart always $discovery"
 image=wfarner/infrakit-demo-plugins
-manager=chungers/infrakit-bundle
+manager=chungers/demo
 
 mkdir -p $configs
 mkdir -p $plugins
@@ -474,6 +474,8 @@ echo "alias infrakit='docker run --rm $discovery $local_store $docker_client $ma
 `
 
 const prepareGroupWatches = `
+configs=/infrakit/configs
+discovery="-e INFRAKIT_PLUGINS_DIR=$plugins -v $plugins:$plugins"
 image=wfarner/infrakit-demo-plugins
 
 {{ range $name, $config := . }}
