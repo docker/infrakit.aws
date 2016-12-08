@@ -430,8 +430,10 @@ func ProvisionManager(
 		Tags:       tags,
 		LogicalID:  &logicalID,
 		Attachments: []instance.Attachment{
-			Type: infrakit_instance.AttachmentEBSVolume,
-			ID:   ip, // we use ip as a unique name for the volume
+			{
+				Type: infrakit_instance.AttachmentEBSVolume,
+				ID:   ip, // we use ip as a unique name for the volume
+			},
 		},
 	})
 	if err != nil {

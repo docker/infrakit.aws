@@ -17,7 +17,7 @@ type Description struct {
 // LogicalID is the logical identifier to associate with an instance.
 type LogicalID string
 
-// AtEtachment is an identifier for a resource to attach to an instance.
+// Attachment is an identifier for a resource to attach to an instance.
 type Attachment struct {
 	// ID is the unique identifier for the attachment.
 	ID string
