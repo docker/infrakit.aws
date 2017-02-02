@@ -11,8 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 	"github.com/aws/aws-sdk-go/service/iam"
 	infrakit_instance "github.com/docker/infrakit.aws/plugin/instance"
-	"github.com/docker/infrakit/spi/group"
-	"github.com/docker/infrakit/spi/instance"
+	"github.com/docker/infrakit/pkg/spi/group"
+	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 	"strings"
 	"text/template"
 	"time"
@@ -420,16 +421,21 @@ func configureWorkerSecurityGroup(ec2Client ec2iface.EC2API, groupID string, man
 func ProvisionManager(
 	provisioner instance.Plugin,
 	tags map[string]string,
-	provisionRequest json.RawMessage,
+	provisionRequest *types.Any,
 	ip string) error {
 
 	logicalID := instance.LogicalID(ip)
 
 	id, err := provisioner.Provision(instance.Spec{
-		Properties:  &provisionRequest,
-		Tags:        tags,
-		LogicalID:   &logicalID,
-		Attachments: []instance.Attachment{instance.Attachment(ip)},
+		Properties: provisionRequest,
+		Tags:       tags,
+		LogicalID:  &logicalID,
+		Attachments: []instance.Attachment{
+			{
+				Type: infrakit_instance.AttachmentEBSVolume,
+				ID:   ip, // we use ip as a unique name for the volume
+			},
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("Failed to provision: %s", err)
@@ -478,7 +484,7 @@ configs=/infrakit/configs
 discovery="-e INFRAKIT_PLUGINS_DIR=$plugins -v $plugins:$plugins"
 image=wfarner/infrakit-demo-plugins
 
-{{ range $name, $config := . }}
+{{ range $name, $config := .ConfigsByName }}
 cat << 'EOF' > "$configs/{{ $name }}.json"
 {{ $config }}
 EOF
@@ -487,7 +493,7 @@ EOF
 # sleep until leadership is decided
 sleep 10
 
-{{ range $name, $config := . }}
+{{ range $name, $config := .ConfigsByName }}
 docker run --rm $discovery -v $configs:$configs $image infrakit group watch $configs/{{ $name }}.json
 {{ end }}
 `
@@ -509,7 +515,9 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 	}
 
 	buffer := bytes.Buffer{}
-	err = template.Must(template.New("").Parse(prepareGroupWatches)).Execute(&buffer, infrakitGroups)
+	err = template.Must(template.New("").Parse(prepareGroupWatches)).Execute(
+		&buffer,
+		map[string]interface{}{"ClusterName": spec.ClusterName, "ConfigsByName": infrakitGroups})
 	if err != nil {
 		return err
 	}
@@ -523,15 +531,15 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 		string(buffer.Bytes()),
 	}, "\n"))
 
-	rawConfig, err := json.Marshal(managerGroup.Config)
+	rawConfig, err := types.AnyValue(managerGroup.Config)
 	if err != nil {
 		return err
 	}
 
 	return ProvisionManager(
 		provisioner,
-		InstanceTags(*spec.cluster().resourceTag(), managerGroup.Name),
-		json.RawMessage(rawConfig),
+		map[string]string{"infrakit.group": string(managerGroup.Name)},
+		rawConfig,
 		spec.ManagerIPs[0])
 }
 

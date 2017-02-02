@@ -4,9 +4,10 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/docker/infrakit.aws/plugin"
 	"github.com/docker/infrakit.aws/plugin/instance"
-	"github.com/docker/infrakit/cli"
-	instance_plugin "github.com/docker/infrakit/rpc/instance"
+	"github.com/docker/infrakit/pkg/cli"
+	instance_plugin "github.com/docker/infrakit/pkg/rpc/instance"
 	"github.com/spf13/cobra"
 	"strings"
 )
@@ -57,7 +58,7 @@ func main() {
 	// user to pass in command line args like containers with entrypoint.
 	cmd.Flags().AddFlagSet(builder.Flags())
 
-	cmd.AddCommand(cli.VersionCommand())
+	cmd.AddCommand(plugin.VersionCommand())
 
 	err := cmd.Execute()
 	if err != nil {

@@ -5,19 +5,25 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"time"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
-	"github.com/docker/infrakit/spi/instance"
-	"sort"
-	"time"
+	"github.com/docker/infrakit/pkg/spi"
+	"github.com/docker/infrakit/pkg/spi/instance"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 const (
 	// VolumeTag is the AWS tag name used to associate unique identifiers (instance.VolumeID) with volumes.
 	VolumeTag = "docker-infrakit-volume"
+
+	// AttachmentEBSVolume is the type name used in instance.Attachment
+	AttachmentEBSVolume = "ebs"
 )
 
 type awsInstancePlugin struct {
@@ -28,7 +34,7 @@ type awsInstancePlugin struct {
 type properties struct {
 	Region   string
 	Retries  int
-	Instance json.RawMessage
+	Instance *types.Any
 }
 
 // NewInstancePlugin creates a new plugin that creates instances in AWS EC2.
@@ -60,10 +66,79 @@ type CreateInstanceRequest struct {
 	RunInstancesInput ec2.RunInstancesInput
 }
 
+// VendorInfo returns a vendor specific name and version
+func (p awsInstancePlugin) VendorInfo() *spi.VendorInfo {
+	return &spi.VendorInfo{
+		InterfaceSpec: spi.InterfaceSpec{
+			Name:    "infrakit-instance-aws",
+			Version: "0.3.0",
+		},
+		URL: "https://github.com/docker/infrakit.aws",
+	}
+}
+
+// ExampleProperties returns the properties / config of this plugin
+func (p awsInstancePlugin) ExampleProperties() *types.Any {
+	example := CreateInstanceRequest{
+		Tags: map[string]string{
+			"tag1": "value1",
+			"tag2": "value2",
+		},
+		RunInstancesInput: ec2.RunInstancesInput{
+			BlockDeviceMappings: []*ec2.BlockDeviceMapping{
+				{
+					// The device name exposed to the instance (for example, /dev/sdh or xvdh).
+					DeviceName: aws.String("/dev/sdh"),
+				},
+			},
+			SecurityGroupIds: []*string{},
+			SecurityGroups:   []*string{},
+		},
+	}
+
+	any, err := types.AnyValue(example)
+	if err != nil {
+		panic(err)
+	}
+	return any
+}
+
 // Validate performs local checks to determine if the request is valid.
-func (p awsInstancePlugin) Validate(req json.RawMessage) error {
+func (p awsInstancePlugin) Validate(req *types.Any) error {
 	// TODO(wfarner): Implement
 	return nil
+}
+
+// Label implements labeling the instances.
+func (p awsInstancePlugin) Label(id instance.ID, labels map[string]string) error {
+
+	output, err := p.client.DescribeTags(&ec2.DescribeTagsInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("resource-id"),
+				Values: []*string{aws.String(string(id))},
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	allTags := map[string]string{}
+	for _, t := range output.Tags {
+		allTags[aws.StringValue(t.Key)] = aws.StringValue(t.Value)
+	}
+
+	keys, merged := mergeTags(allTags, labels)
+
+	tags := []*ec2.Tag{}
+	for _, k := range keys {
+		key := k
+		tags = append(tags, &ec2.Tag{Key: aws.String(key), Value: aws.String(merged[key])})
+	}
+
+	_, err = p.client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{aws.String(string(id))}, Tags: tags})
+	return err
 }
 
 // mergeTags merges multiple maps of tags, implementing 'last write wins' for colliding keys.
@@ -89,6 +164,52 @@ func mergeTags(tagMaps ...map[string]string) ([]string, map[string]string) {
 	sort.Strings(keys)
 
 	return keys, tags
+}
+
+func (p awsInstancePlugin) findEBSVolumeAttachments(spec instance.Spec) ([]*string, error) {
+	found := []*string{}
+
+	// for querying volumes
+	filterValues := []*string{}
+
+	for _, attachment := range spec.Attachments {
+		if attachment.Type == AttachmentEBSVolume {
+			s := attachment.ID
+			filterValues = append(filterValues, &s)
+		}
+	}
+
+	if len(filterValues) == 0 {
+		return found, nil // nothing
+	}
+
+	volumes, err := p.client.DescribeVolumes(&ec2.DescribeVolumesInput{
+		Filters: []*ec2.Filter{
+			// TODO(wfarner): Need a way to disambiguate between volumes associated with different
+			// clusters.  Currently, volume IDs are private IP addresses, which are not guaranteed
+			// unique in separate VPCs.
+			{
+				Name:   aws.String(fmt.Sprintf("tag:%s", VolumeTag)),
+				Values: filterValues,
+			},
+		},
+	})
+	if err != nil {
+		return nil, errors.New("Failed while looking up volume")
+	}
+
+	// TODO(chungers) -- not dealing with if only a subset is found.
+	if len(volumes.Volumes) != len(spec.Attachments) {
+		return nil, fmt.Errorf(
+			"Not all required volumes found to attach.  Wanted %s, found %s",
+			spec.Attachments,
+			volumes.Volumes)
+	}
+
+	for _, volume := range volumes.Volumes {
+		found = append(found, volume.VolumeId)
+	}
+	return found, nil
 }
 
 // Provision creates a new instance.
@@ -124,41 +245,6 @@ func (p awsInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 			base64.StdEncoding.EncodeToString([]byte(*request.RunInstancesInput.UserData)))
 	}
 
-	awsVolumeIDs := []*string{}
-	if spec.Attachments != nil && len(spec.Attachments) > 0 {
-		filterValues := []*string{}
-		for _, attachment := range spec.Attachments {
-			s := string(attachment)
-			filterValues = append(filterValues, &s)
-		}
-
-		volumes, err := p.client.DescribeVolumes(&ec2.DescribeVolumesInput{
-			Filters: []*ec2.Filter{
-				// TODO(wfarner): Need a way to disambiguate between volumes associated with different
-				// clusters.  Currently, volume IDs are private IP addresses, which are not guaranteed
-				// unique in separate VPCs.
-				{
-					Name:   aws.String(fmt.Sprintf("tag:%s", VolumeTag)),
-					Values: filterValues,
-				},
-			},
-		})
-		if err != nil {
-			return nil, errors.New("Failed while looking up volume")
-		}
-
-		if len(volumes.Volumes) == len(spec.Attachments) {
-			for _, volume := range volumes.Volumes {
-				awsVolumeIDs = append(awsVolumeIDs, volume.VolumeId)
-			}
-		} else {
-			return nil, fmt.Errorf(
-				"Not all required volumes found to attach.  Wanted %s, found %s",
-				spec.Attachments,
-				volumes.Volumes)
-		}
-	}
-
 	reservation, err := p.client.RunInstances(&request.RunInstancesInput)
 	if err != nil {
 		return nil, err
@@ -172,6 +258,12 @@ func (p awsInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	id := (*instance.ID)(ec2Instance.InstanceId)
 
 	err = p.tagInstance(ec2Instance, spec.Tags, request.Tags)
+	if err != nil {
+		return id, err
+	}
+
+	// work with attachments
+	awsVolumeIDs, err := p.findEBSVolumeAttachments(spec)
 	if err != nil {
 		return id, err
 	}
