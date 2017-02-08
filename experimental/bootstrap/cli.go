@@ -51,7 +51,7 @@ type clusterIDFlags struct {
 
 func (c *clusterIDFlags) flags() *pflag.FlagSet {
 	clusterIDFlags := pflag.NewFlagSet("cluster ID", pflag.ExitOnError)
-	clusterIDFlags.StringVar(&c.ID.region, "region", "", "AWS region")
+	clusterIDFlags.StringVar(&c.ID.region, "region", "us-west-1", "AWS region")
 	clusterIDFlags.StringVar(&c.ID.name, "cluster", "", "Infrakit cluster name")
 	return clusterIDFlags
 }
@@ -72,7 +72,8 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 	var keyName string
 
 	workerSize := 3
-
+	ami := "ami-bd4f05dd" // generic - "ami-6e165d0e"
+	az := "b"
 	createCmd := cobra.Command{
 		Use:   "create [<cluster config>]",
 		Short: "create a swarm cluster",
@@ -95,11 +96,11 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 
 				instanceConfig := instance.CreateInstanceRequest{
 					RunInstancesInput: ec2.RunInstancesInput{
-						ImageId: aws.String("ami-d4fe5fb4"),
+						ImageId: aws.String(ami),
 						KeyName: aws.String(keyName),
 						Placement: &ec2.Placement{
 							// TODO(wfarner): Picking the AZ like this feels hackish.
-							AvailabilityZone: aws.String(cluster.ID.region + "a"),
+							AvailabilityZone: aws.String(cluster.ID.region + az),
 						},
 					},
 				}
@@ -137,6 +138,8 @@ func (a *CLI) AddCommands(root *cobra.Command) {
 		},
 	}
 	createCmd.Flags().AddFlagSet(cluster.flags())
+	createCmd.Flags().StringVar(&ami, "ami", ami, "AMI to use")
+	createCmd.Flags().StringVar(&az, "az", az, "Availability zone to use")
 	createCmd.Flags().StringVar(&keyName, "key", "", "The existing SSH key in AWS to use for provisioned instances")
 	createCmd.Flags().IntVar(&workerSize, "worker_size", workerSize, "Size of worker group")
 

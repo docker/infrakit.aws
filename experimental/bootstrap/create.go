@@ -445,15 +445,44 @@ func ProvisionManager(
 	return nil
 }
 
-const prepareGroupWatches = `
+// InstanceTags gets the tags used to associate an instance with a group.
+func InstanceTags(resourceTag ec2.Tag, gid group.ID) map[string]string {
+	return map[string]string{
+		*resourceTag.Key: *resourceTag.Value,
+		"infrakit.group": string(gid),
+	}
+}
+
+const startInfraKit = `
 plugins=/infrakit/plugins
 configs=/infrakit/configs
 discovery="-e INFRAKIT_PLUGINS_DIR=$plugins -v $plugins:$plugins"
+local_store="-v /infrakit/:/infrakit/"
+docker_client="-v /var/run/docker.sock:/var/run/docker.sock"
 run_plugin="docker run -d --restart always $discovery"
 image=wfarner/infrakit-demo-plugins
+manager=chungers/demo
 
 mkdir -p $configs
 mkdir -p $plugins
+
+docker pull $image
+docker pull $manager
+$run_plugin --name flavor-combo $image infrakit-flavor-combo --log 5
+$run_plugin --name flavor-swarm $docker_client $image infrakit-flavor-swarm --log 5 --name flavor-swarm
+$run_plugin --name flavor-vanilla $image infrakit-flavor-vanilla --log 5
+$run_plugin --name group-stateless $image infrakit-group-default --name group-stateless --log 5
+$run_plugin --name instance-aws $image infrakit-instance-aws --log 5
+$run_plugin --name manager $docker_client $manager infrakit-manager swarm --proxy-for-group group-stateless --name group --log 5
+
+echo "alias infrakit='docker run --rm $discovery $local_store $docker_client $manager infrakit'" >> /home/ubuntu/.bashrc
+echo "alias infrakit='docker run --rm $discovery $local_store $docker_client $manager infrakit'" >> /root/.bashrc
+`
+
+const prepareGroupWatches = `
+configs=/infrakit/configs
+discovery="-e INFRAKIT_PLUGINS_DIR=$plugins -v $plugins:$plugins"
+image=wfarner/infrakit-demo-plugins
 
 {{ range $name, $config := .ConfigsByName }}
 cat << 'EOF' > "$configs/{{ $name }}.json"
@@ -461,14 +490,8 @@ cat << 'EOF' > "$configs/{{ $name }}.json"
 EOF
 {{ end }}
 
-docker pull $image
-$run_plugin --name flavor-combo $image infrakit-flavor-combo
-$run_plugin --name flavor-swarm -v /var/run/docker.sock:/var/run/docker.sock $image infrakit-flavor-swarm
-$run_plugin --name flavor-vanilla $image infrakit-flavor-vanilla
-$run_plugin --name group-default $image infrakit-group-default
-$run_plugin --name instance-aws $image infrakit-instance-aws --namespace-tags infrakit.cluster={{.ClusterName}}
-
-echo "alias infrakit='docker run --rm $discovery -v $configs:$configs $image infrakit'" >> /home/ubuntu/.bashrc
+# sleep until leadership is decided
+sleep 10
 
 {{ range $name, $config := .ConfigsByName }}
 docker run --rm $discovery -v $configs:$configs $image infrakit group watch $configs/{{ $name }}.json
@@ -504,6 +527,7 @@ func startInitialManager(config client.ConfigProvider, spec clusterSpec) error {
 		"#!/bin/bash",
 		initializeManager,
 		"docker swarm init",
+		startInfraKit,
 		string(buffer.Bytes()),
 	}, "\n"))
 
@@ -716,7 +740,10 @@ func generateInfraKitGroups(spec clusterSpec) (map[group.ID]string, error) {
 		if grp.isManager() {
 			templateText = managerGroup
 			templateParams["ManagerIPs"] = spec.ManagerIPs
-			templateParams["BootScript"] = initializeManager
+			templateParams["BootScript"] = strings.Join([]string{
+				initializeManager,
+				startInfraKit,
+			}, "\n")
 		} else {
 			templateText = workerGroup
 			templateParams["WorkerCount"] = grp.Size
