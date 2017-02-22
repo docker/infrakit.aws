@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// Options containe properties important for the AWS api
 type Options struct {
 	Region          string
 	AccessKeyID     string

@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrNotFound     = fmt.Errorf("not-found")
+	// ErrNotSupported is when an object cannot be 'described' via AWS api either through lack of mapping or bad input
 	ErrNotSupported = fmt.Errorf("not-supported")
 )
 

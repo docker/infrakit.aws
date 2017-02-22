@@ -16,12 +16,14 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+// AWSClients holds a set of AWS API clients
 type AWSClients struct {
 	Cfn cloudformationiface.CloudFormationAPI
 	Ec2 ec2iface.EC2API
 	Asg autoscalingiface.AutoScalingAPI
 }
 
+// Context is the template context for the template which when evaluated, exports metadata.
 type Context struct {
 	update          chan func(map[string]interface{})
 	poll            time.Duration
@@ -144,7 +146,7 @@ func (c *Context) Funcs() []template.Function {
 					}
 					return describe(c.clients, rr)
 				}
-				return nil, fmt.Errorf("unknown object:", o)
+				return nil, fmt.Errorf("unknown object %v", o)
 			},
 		},
 		{
