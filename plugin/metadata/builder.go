@@ -84,6 +84,7 @@ func NewPlugin(templateURL string, templateOptions template.Options, poll time.D
 	context := &Context{
 		templateURL:     templateURL,
 		templateOptions: templateOptions,
+		poll:            poll,
 		stop:            stop,
 		stackName:       stackName,
 		clients: AWSClients{

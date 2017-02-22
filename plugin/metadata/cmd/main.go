@@ -20,7 +20,7 @@ func main() {
 
 	var logLevel int
 	var name, stack, templateURL string
-	poll := 1 * time.Minute
+	poll := 1 * time.Second
 
 	cmd := &cobra.Command{
 		Use:   os.Args[0],
@@ -49,7 +49,7 @@ func main() {
 		},
 	}
 	cmd.Flags().IntVar(&logLevel, "log", cli.DefaultLogLevel, "Logging level. 0 is least verbose. Max is 5")
-	cmd.Flags().StringVar(&name, "name", "reflect-aws", "Plugin name to advertise for discovery")
+	cmd.Flags().StringVar(&name, "name", "metadata-aws", "Plugin name to advertise for discovery")
 	cmd.Flags().AddFlagSet(options.Flags())
 	cmd.Flags().StringVar(&stack, "stack", "", "CFN stack name to introspect")
 	cmd.Flags().StringVar(&templateURL, "template-url", "", "URL of the template to evaluate and export metadata.")

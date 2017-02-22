@@ -35,6 +35,7 @@ type Context struct {
 
 func (c *Context) start() {
 
+	log.Infoln("Staring context:", c, c.poll)
 	update := make(chan func(map[string]interface{}))
 	tick := time.Tick(c.poll)
 
@@ -48,10 +49,13 @@ func (c *Context) start() {
 			select {
 			case <-tick:
 
+				log.Debugln("Running template to export metadata:", c.templateURL)
+
 				t, err := template.NewTemplate(c.templateURL, c.templateOptions)
 				if err != nil {
+					log.Warningln("err running template:", err)
 					update <- func(view map[string]interface{}) {
-						view["err"] = err
+						view["err"] = err.Error()
 					}
 					continue loop
 				}
@@ -60,10 +64,15 @@ func (c *Context) start() {
 				// that are invoked as part of processing the template.
 				_, err = t.Render(c)
 				if err != nil {
+					log.Warningln("err evaluating template:", err)
 					update <- func(view map[string]interface{}) {
-						view["err"] = err
+						view["err"] = err.Error()
 					}
 					continue loop
+				} else {
+					update <- func(view map[string]interface{}) {
+						delete(view, "err")
+					}
 				}
 
 			case <-c.stop:
