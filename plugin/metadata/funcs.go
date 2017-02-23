@@ -109,7 +109,7 @@ func cfn(clients AWSClients, name string) (interface{}, error) {
 	}
 
 	// index resources by type/name
-	resources := []interface{}{}
+	resources := map[string]map[string]interface{}{}
 	for _, r := range output2.StackResources {
 		if r.ResourceType == nil {
 			continue
@@ -117,16 +117,22 @@ func cfn(clients AWSClients, name string) (interface{}, error) {
 		if r.LogicalResourceId == nil {
 			continue
 		}
-		resources = append(resources, r)
+		if sub, has := resources[*r.ResourceType]; !has {
+			resources[*r.ResourceType] = map[string]interface{}{
+				*r.LogicalResourceId: r,
+			}
+		} else {
+			sub[*r.LogicalResourceId] = r
+		}
 	}
 
 	// index parameters by name
-	parameters := []interface{}{}
+	parameters := map[string]interface{}{}
 	for _, p := range output.Stacks[0].Parameters {
 		if p.ParameterKey == nil {
 			continue
 		}
-		parameters = append(parameters, p)
+		parameters[*p.ParameterKey] = p
 	}
 
 	// JMESPath package has trouble with fields that are pointers

@@ -1,7 +1,9 @@
 package metadata
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -90,12 +92,47 @@ func (c *Context) start() {
 // List returns a list of *child nodes* given a path, which is specified as a slice
 // where for i > j path[i] is the parent of path[j]
 func (c *Context) List(path metadata.Path) (child []string, err error) {
-	return c.impl.List(path)
+	if path.Len() == 0 {
+		return []string{"export", "local"}, nil
+	}
+	if first := path.Index(0); first != nil && "local" == *first {
+		str, err := instance.GetMetadata(instance.MetadataKeyFromSlice([]string(path.Shift(1))))
+		if err != nil {
+			return nil, nil // this will stop any further traversals into local/
+		}
+		// is this a json?
+		decoded := map[string]interface{}{}
+		if err := json.Unmarshal([]byte(str), &decoded); err == nil {
+			return metadata_plugin.List([]string(path.Shift(1)), decoded), nil
+		}
+		trimmed := []string{}
+		for _, s := range strings.Split(str, "\n") {
+			trimmed = append(trimmed, strings.Trim(s, " \t\n"))
+		}
+		return trimmed, nil
+	}
+	return c.impl.List(path.Shift(1))
 }
 
 // Get retrieves the value at path given.
 func (c *Context) Get(path metadata.Path) (value *types.Any, err error) {
-	return c.impl.Get(path)
+	if path.Len() == 0 {
+		return nil, nil
+	}
+	if first := path.Index(0); first != nil && "local" == *first {
+		str, err := instance.GetMetadata(instance.MetadataKeyFromSlice([]string(path.Shift(1))))
+		if err != nil {
+			return types.AnyString(err.Error()), nil // let the value be the error
+		}
+
+		// try to decode as json
+		decoded := map[string]interface{}{}
+		if err := json.Unmarshal([]byte(str), &decoded); err == nil {
+			return types.AnyValue(decoded)
+		}
+		return types.AnyValue(str)
+	}
+	return c.impl.Get(path.Shift(1))
 }
 
 // Funcs return the additional functions that are available for AWS.
