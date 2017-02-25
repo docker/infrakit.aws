@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -134,7 +135,10 @@ func (p awsInstancePlugin) Label(id instance.ID, labels map[string]string) error
 	tags := []*ec2.Tag{}
 	for _, k := range keys {
 		key := k
-		tags = append(tags, &ec2.Tag{Key: aws.String(key), Value: aws.String(merged[key])})
+		// filter out the special aws: key because it's reserved so leave them alone
+		if strings.Index(key, "aws:") == -1 {
+			tags = append(tags, &ec2.Tag{Key: aws.String(key), Value: aws.String(merged[key])})
+		}
 	}
 
 	_, err = p.client.CreateTags(&ec2.CreateTagsInput{Resources: []*string{aws.String(string(id))}, Tags: tags})
