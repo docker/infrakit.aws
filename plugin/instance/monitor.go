@@ -25,7 +25,7 @@ type Monitor struct {
 	Plugin instance.Plugin
 }
 
-func (t *Monitor) getEndpoint() interface{} {
+func (m *Monitor) getEndpoint() interface{} {
 	return "redirect to endpoint (not implemented)"
 }
 
@@ -44,7 +44,7 @@ func (m *Monitor) Init() event.Plugin {
 	return m
 }
 
-// Stops the monitor
+// Stop stops the monitor
 func (m *Monitor) Stop() {
 	if m.stop != nil {
 		close(m.stop)
