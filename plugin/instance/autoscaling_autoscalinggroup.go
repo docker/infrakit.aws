@@ -5,13 +5,12 @@ import (
 	"errors"
 	"fmt"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
-	log "github.com/Sirupsen/logrus"
-
 )
 
 type awsAutoScalingGroupPlugin struct {
@@ -63,7 +62,7 @@ func (p awsAutoScalingGroupPlugin) Provision(spec instance.Spec) (*instance.ID, 
 	for _, key := range keys {
 		autoscalingTags = append(
 			autoscalingTags,
-			&autoscaling.Tag {
+			&autoscaling.Tag{
 				ResourceId:        request.CreateAutoScalingGroupInput.AutoScalingGroupName,
 				ResourceType:      aws.String("auto-scaling-group"),
 				Key:               aws.String(key),
@@ -72,7 +71,7 @@ func (p awsAutoScalingGroupPlugin) Provision(spec instance.Spec) (*instance.ID, 
 			},
 		)
 	}
-	_, err = p.client.CreateOrUpdateTags(&autoscaling.CreateOrUpdateTagsInput{Tags:autoscalingTags})
+	_, err = p.client.CreateOrUpdateTags(&autoscaling.CreateOrUpdateTagsInput{Tags: autoscalingTags})
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func (p awsAutoScalingGroupPlugin) Destroy(id instance.ID) error {
 Return true iff searchTags is a subset of tags
 */
 func matchAll(searchTags map[string]string, tags map[string]string) bool {
-	for k,v := range searchTags {
+	for k, v := range searchTags {
 		if v != tags[k] {
 			return false
 		}
