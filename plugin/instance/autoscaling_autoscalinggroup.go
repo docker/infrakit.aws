@@ -40,9 +40,9 @@ func (p awsAutoScalingGroupPlugin) Provision(spec instance.Spec) (*instance.ID, 
 
 	if spec.LogicalID == nil {
 		return nil, errors.New("No AutoScalingGroup name found: missing LogicalID")
-	} else {
-		request.CreateAutoScalingGroupInput.AutoScalingGroupName = (*string)(spec.LogicalID)
 	}
+
+	request.CreateAutoScalingGroupInput.AutoScalingGroupName = (*string)(spec.LogicalID)
 
 	_, err := p.client.CreateAutoScalingGroup(&request.CreateAutoScalingGroupInput)
 	if err != nil {
